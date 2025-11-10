@@ -6,7 +6,7 @@
 #define OUT_DIR "out/"
 
 #define CC      "gcc"
-#define CFLAGS  "-I../include", "-ggdb", "-Wall", "-std=gnu11", "-Wextra", "-pedantic", "-Werror", "-c"
+#define CFLAGS  get_libcore_inc(), "-I../include", "-ggdb", "-Wall", "-std=gnu11", "-Wextra", "-pedantic", "-Werror", "-c"
 #define LIBNAME "kiek"
 
 #define AR      "ar"
@@ -24,6 +24,31 @@ static const char *ignore_list[] = {
 };
 
 #define MIN_FILENAME_LEN 1
+
+const char *check_getenv(const char *key)
+{
+    const char *value = getenv(key);
+    if (!value) {
+        nob_log(NOB_ERROR, "failed to getenv: %s returned NULL", key);
+        abort();
+    }
+    return value;
+}
+
+const char *get_libcore_inc(void)
+{
+    static char inc_dir[PATH_MAX + 1] = {0};
+    bool once_flag = false;
+
+    if (once_flag == false) {
+        strncpy(inc_dir, "-I", NOB_ARRAY_LEN(inc_dir));
+        strncat(inc_dir, check_getenv("LIB_CORE_INCLUDE_DIR"), NOB_ARRAY_LEN(inc_dir)-strlen(inc_dir));
+    }
+    once_flag = true;
+
+    return inc_dir;
+}
+
 /* checks for file extensions */
 bool is_type(const char *file, const char *type)
 {
