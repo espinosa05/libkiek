@@ -1,5 +1,4 @@
 #include <kiek/kiek_vulkan_backend.h>
-#include <core/wm.h>
 #include <core/wm_vulkan.h>
 #include <core/memory.h>
 #include <core/types.h>
@@ -23,13 +22,14 @@
 
 /* static function declaration start */
 static void set_application_version_header(struct kiek_app_version_header *version_header, struct kiek_app_version_header *user_arg);
-static void get_required_instance_extension_names(struct m_array *required_extension_names);
 static void get_present_instance_extension_properties(struct m_array *present_extension_array);
-static b32 required_instance_extensions_present(const struct m_array required_extension_name_array);
+static b32 required_instance_extensions_present(const struct wm_vulkan_extensions *required_extension_names);
 /* static function declaration end */
 
 void kiek_vulkan_startup(struct kiek_vulkan_context *kvk, const struct kiek_vulkan_context_info kvk_info)
 {
+    CHECK_NULL(kvk_info.extensions);
+
     /* set application info */
     struct kiek_app_version_header version_header = {0};
     set_application_version_header(&version_header, kvk_info.version);
@@ -42,17 +42,19 @@ void kiek_vulkan_startup(struct kiek_vulkan_context *kvk, const struct kiek_vulk
     };
 
     /* initialize the Vulkan API */
-    struct m_array instance_extensions = {0};
-    get_required_instance_extension_names(&instance_extensions);
-    ASSERT_RT(required_instance_extensions_present(instance_extensions), "required vulkan extensions not available");
+    ASSERT_RT(required_instance_extensions_present(kvk_info.extensions), "required vulkan extensions not available");
     VkInstanceCreateInfo instance_info = {
         .sType                      = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,
         .pApplicationInfo           = &app_info,
-        .enabledExtensionCount      = instance_extensions.count,
-        .ppEnabledExtensionNames    = instance_extensions.data,
+        .enabledExtensionCount      = kvk_info.extensions->count,
+        .ppEnabledExtensionNames    = kvk_info.extensions->names,
     };
     VULKAN_SETUP_CHECK(vkCreateInstance(&instance_info, NULL, &kvk->instance));
-    m_array_delete(instance_extensions);
+}
+
+VkInstance kiek_vulkan_get_instance(const struct kiek_vulkan_context kvk)
+{
+    return kvk.instance;
 }
 
 void kiek_vulkan_shutdown(struct kiek_vulkan_context *kvk)
@@ -90,20 +92,6 @@ static void set_application_version_header(struct kiek_app_version_header *versi
                version_header->patch);
 }
 
-static void get_required_instance_extension_names(struct m_array *required_extension_names)
-{
-    struct wm_extensions wm_extensions = {0};
-    wm_get_required_vulkan_extensions(&wm_extensions);
-
-    struct m_array_info required_extension_names_info = {
-        .width  = sizeof(*wm_extensions.names),
-        .base   = wm_extensions.names,
-        .cap    = wm_extensions.count,
-        .count  = wm_extensions.count,
-    };
-    m_array_init_ext(required_extension_names, required_extension_names_info);
-}
-
 #define GET_MAJOR_VERSION(ver)  (((u32)(ver)<<22U)&0xFF)
 #define GET_MINOR_VERSION(ver)  (((u32)(ver)<<12U)&0xFF)
 #define GET_PATCH(ver)          (ver&0xFF)
@@ -127,23 +115,19 @@ static void print_instance_extension_property_names(struct m_array present_exten
     }
 }
 
-static b32 required_instance_extensions_present(const struct m_array required_extension_name_array)
+static b32 required_instance_extensions_present(const struct wm_vulkan_extensions *required_extensions)
 {
-    ASSERT(required_extension_name_array.count,    "array of size 0 passed!!");
-    ASSERT(required_extension_name_array.data,     "array pointing to NULL passed!!");
-
     struct m_array present_extension_array = {0};
     get_present_instance_extension_properties(&present_extension_array);
     print_instance_extension_property_names(present_extension_array);
 
-    char **required_extension_names = required_extension_name_array.data;
     VkExtensionProperties *present_extensions = present_extension_array.data;
-
     b32 required_extensions_present = FALSE;
-    for (u32 i = 0; i < required_extension_name_array.count; ++i) {
+
+    for (u32 i = 0; i < required_extensions->count; ++i) {
         required_extensions_present = FALSE;
         for (u32 j = 0; j < present_extension_array.count; ++j) {
-            if (cstr_compare(present_extensions[j].extensionName, required_extension_names[i])) {
+            if (cstr_compare(present_extensions[j].extensionName, required_extensions->names[i])) {
                 required_extensions_present = TRUE;
                 break;
             }
@@ -153,6 +137,7 @@ static b32 required_instance_extensions_present(const struct m_array required_ex
         }
     }
 
+    /* free vulkan allocated data */
     m_free(present_extensions);
 
     return required_extensions_present;
