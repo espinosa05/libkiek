@@ -4,6 +4,7 @@
 #include <core/types.h>
 #include <core/utils.h>
 #include <core/log.h>
+#include <core/strings.h>
 
 #define KIEK_ENGINE_ID_STRING "KIEK!"
 
@@ -79,14 +80,14 @@ static void set_application_version_header(struct kiek_app_version_header *versi
 {
     *version_header = KIEK_APPLICATION_VERSION_HEADER_DEFAULT;
     if (!user_arg) {
-        KIEK_TRACE("No \"KIEK!\" application version passed! falling back to default Testing version...");
+        KIEK_TRACE("No"STR_QUOT("KIEK!")"application version passed! falling back to default Testing version...");
         *version_header = *user_arg;
     }
 
-    KIEK_TRACE("\nKIEK!-Vulkan-App Information\n"
-               "\tKiek-Version-Major\t:%d\n"
-               "\tKiek-Version-Minor\t:%d\n"
-               "\tKiek-Version-Patch\t:%d\n",
+    KIEK_TRACE(STR_NL"KIEK!-Vulkan-App Information"STR_NL
+               STR_TAB"Kiek-Version-Major"STR_TAB": "USZ_FMT STR_NL
+               STR_TAB"Kiek-Version-Minor"STR_TAB": "USZ_FMT STR_NL
+               STR_TAB"Kiek-Version-Patch"STR_TAB": "USZ_FMT STR_NL,
                version_header->major,
                version_header->minor,
                version_header->patch);
